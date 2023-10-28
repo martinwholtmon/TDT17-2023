@@ -1,6 +1,9 @@
+"""Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
 from pathlib import Path
 import timm
+import torch
 import torch.nn as nn
+import torch.optim as optim
 from torchvision import datasets
 from torch.utils.data import DataLoader
 
@@ -82,6 +85,29 @@ def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
                     f"Epoch: {epoch+1}/{epochs} | Batch {batch_idx}/{len(train_loader)} | Loss: {loss.item():.4f}"
                 )
     return history
+
+
+def main():
+    # Params
+    epochs = 10
+    batch_size = 32
+
+    # Get device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Load data
+    train_loader, test_loader = get_dataloaders(batch_size)
+
+    # Define the model
+    model = SegmentationModel(num_classes=30).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    criterion = nn.CrossEntropyLoss()
+
+    # Train the model
+    history = train(model, train_loader, optimizer, criterion, device, epochs)
+
+    # Save model
+    torch.save(model.state_dict(), "semantic_segmentation.pth")
 
 
 if __name__ == "__main__":
