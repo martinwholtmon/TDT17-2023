@@ -48,8 +48,41 @@ def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
 
     return train_loader, test_loader
 
-def main(): 
-    print("Hello World!")
+
+def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
+    """The training loop
+
+    Args:
+        model (nn.Module): PyTorch model
+        train_loader (DataLoader): DataLoader for training data
+        optimizer (torch.optim): Optimizer
+        criterion (torch.nn): Loss function
+        device (torch.device): Device to use
+        epochs (int): Epochs to train
+
+    Returns:
+        list: loss hitory
+    """
+    history = []
+    for epoch in range(epochs):
+        model.train()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(device), target.to(device)
+
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+            history.append(loss.item())  # Save loss for plotting
+
+            # Print info
+            if batch_idx % 10 == 0:
+                print(
+                    f"Epoch: {epoch+1}/{epochs} | Batch {batch_idx}/{len(train_loader)} | Loss: {loss.item():.4f}"
+                )
+    return history
+
 
 if __name__ == "__main__":
     main()
