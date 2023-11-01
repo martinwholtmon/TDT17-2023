@@ -2,10 +2,10 @@
 from pathlib import Path
 import timm
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision import datasets, transforms
+from torch import nn
+from torch import optim
 from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
 
 
 class SegmentationModel(nn.Module):
@@ -70,13 +70,13 @@ def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
     )
 
     # Define dataloaders
+    print(f"Loaded. Creating dataloaders...")
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     # Print info about loaded data
     print(f"Train examples: {len(train_loader.dataset)}")
     print(f"Val examples: {len(val_loader.dataset)}")
-
     return train_loader, val_loader
 
 
@@ -94,11 +94,13 @@ def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
     Returns:
         list: loss hitory
     """
+    print("Starting training loop")
     history = []
     for epoch in range(epochs):
-        model.train()
+        model.train()  # set training mode
         for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
+            data = data.to(device)
+            target = target.to(device)
 
             optimizer.zero_grad()
             output = model(data)
@@ -108,17 +110,19 @@ def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
             history.append(loss.item())  # Save loss for plotting
 
             # Print info
-            if batch_idx % 10 == 0:
-                print(
-                    f"Epoch: {epoch+1}/{epochs} | Batch {batch_idx}/{len(train_loader)} | Loss: {loss.item():.4f}"
-                )
+            # if batch_idx % 10 == 0:
+            print(
+                f"Epoch: {epoch+1}/{epochs} | Batch {batch_idx}/{len(train_loader)} | Loss: {loss.item():.4f}"
+            )
     return history
 
 
 def main():
+    print("Starting")
+
     # Params
     epochs = 10
-    batch_size = 32
+    batch_size = 2
 
     # Get device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
