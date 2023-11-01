@@ -4,7 +4,7 @@ import timm
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 
@@ -24,32 +24,60 @@ class SegmentationModel(nn.Module):
 
 
 def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
-    """Load the dataset and return the dataloaders
+    """Load the dataset from file
 
     Args:
         batch_size (int, optional): Size of the batch. Defaults to 32.
 
     Returns:
-        tuple[DataLoader, DataLoader]: train_loader, test_loader
+        tuple[DataLoader, DataLoader]: train_loader, val_loader
     """
     # root dir
-    data_dir = Path(__file__) / "data" / "cityscapes"
+    data_dir = Path(__file__).parent / "data" / "cityscapes"
     print(f"Loading data from {data_dir}")
 
-    # Load data from directory
-    # TODO: Add transforms
-    train_dataset = datasets.Cityscapes(
-        data_dir, split="train", mode="fine", target_type="semantic"
+    # Define transformations
+    transform = transforms.Compose(
+        [
+            # TODO: Add transformations
+            transforms.ToTensor()
+        ]
     )
-    test_dataset = datasets.Cityscapes(
-        data_dir, split="val", mode="fine", target_type="semantic"
+
+    target_transforms = transforms.Compose(
+        [
+            # TODO: Add transformations
+            transforms.ToTensor()
+        ]
+    )
+
+    # Load data from directory
+    train_dataset = datasets.Cityscapes(
+        data_dir,
+        split="train",
+        mode="fine",
+        target_type="semantic",
+        transform=transform,
+        target_transform=target_transforms,
+    )
+    val_dataset = datasets.Cityscapes(
+        data_dir,
+        split="val",
+        mode="fine",
+        target_type="semantic",
+        transform=transform,
+        target_transform=target_transforms,
     )
 
     # Define dataloaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    return train_loader, test_loader
+    # Print info about loaded data
+    print(f"Train examples: {len(train_loader.dataset)}")
+    print(f"Val examples: {len(val_loader.dataset)}")
+
+    return train_loader, val_loader
 
 
 def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
@@ -94,9 +122,10 @@ def main():
 
     # Get device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
 
     # Load data
-    train_loader, test_loader = get_dataloaders(batch_size)
+    train_loader, val_loader = get_dataloaders(batch_size)
 
     # Define the model
     model = SegmentationModel(num_classes=30).to(device)
@@ -107,7 +136,7 @@ def main():
     history = train(model, train_loader, optimizer, criterion, device, epochs)
 
     # Save model
-    torch.save(model.state_dict(), "semantic_segmentation.pth")
+    # torch.save(model.state_dict(), "semantic_segmentation.pth")
 
 
 if __name__ == "__main__":
