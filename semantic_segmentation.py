@@ -39,15 +39,20 @@ def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
     # Define transformations
     transform = transforms.Compose(
         [
-            # TODO: Add transformations
-            transforms.ToTensor()
+            transforms.Resize((256, 256)),  # Resize images to a fixed size for training
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ),  # Normalize with ImageNet stats
         ]
     )
 
     target_transforms = transforms.Compose(
         [
-            # TODO: Add transformations
-            transforms.ToTensor()
+            transforms.Resize(
+                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
+            ),  # Resize masks without interpolation
+            transforms.ToTensor(),
         ]
     )
 
