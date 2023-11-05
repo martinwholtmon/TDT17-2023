@@ -6,21 +6,7 @@ from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
-
-class SegmentationModel(nn.Module):
-    """The model for semantic segmentation using EfficientViTB3 as backbone"""
-
-    def __init__(self, num_classes) -> None:
-        super(SegmentationModel, self).__init__()
-        self.backbone = timm.create_model("efficientvit_b3", pretrained=True)
-        self.classifier = nn.Conv2d(
-            self.backbone.num_features, num_classes, kernel_size=1
-        )
-
-    def forward(self, x):
-        features = self.backbone(x)
-        return self.classifier(features)
+from unet import UNet
 
 
 def get_dataloaders(
@@ -81,6 +67,16 @@ def get_dataloaders(
     print(f"Train examples: {len(train_loader.dataset)}")
     print(f"Val examples: {len(val_loader.dataset)}")
     return train_loader, val_loader
+
+
+def main():
+    print("Starting")
+
+    # Params
+    LEARNING_RATE = 1e-4
+    CLASSES_TO_PREDICT = 19
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    EPOCHS = 3
     BATCH_SIZE = 2
     WORKERS = 2
     PIN_MEMORY = True
@@ -113,9 +109,11 @@ def get_dataloaders(
     )
 
     # Define the model
-    model = SegmentationModel(num_classes=30).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    model = UNet(in_channels=3, out_channels=CLASSES_TO_PREDICT).to(DEVICE)
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = optim.Adam(params, lr=LEARNING_RATE)
     criterion = nn.CrossEntropyLoss()
+    scaler = torch.cuda.amp.GradScaler()
 
     # Train the model
     history = train(model, train_loader, optimizer, criterion, device, epochs)
