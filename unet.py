@@ -104,3 +104,10 @@ class UNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight)
+
+    @torch.no_grad()
+    def predict(self, x):
+        if self.training:
+            self.eval()
+        x = self.forward(x)
+        return x
