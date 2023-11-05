@@ -66,5 +66,14 @@ class UNet(nn.Module):
 
         # Change the out_channels of the final convolution to num_classes
         self.final_conv = nn.Conv2d(features[0], out_channels, kernel_size=1)
+        self._init_weight()
     def forward(self, x):
-        pass
+    def _init_weight(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.ConvTranspose2d):
+                nn.init.kaiming_normal_(m.weight)
