@@ -83,43 +83,6 @@ def get_dataloaders(
     return train_loader, val_loader
 
 
-def train(model, train_loader, optimizer, criterion, device, epochs) -> list:
-    """The training loop
-
-    Args:
-        model (nn.Module): PyTorch model
-        train_loader (DataLoader): DataLoader for training data
-        optimizer (torch.optim): Optimizer
-        criterion (torch.nn): Loss function
-        device (torch.device): Device to use
-        epochs (int): Epochs to train
-
-    Returns:
-        list: loss hitory
-    """
-    print("Starting training loop")
-    history = []
-    for epoch in range(epochs):
-        model.train()  # set training mode
-        for batch_idx, (data, target) in enumerate(train_loader):
-            data = data.to(device)
-            target = target.to(device)
-
-            optimizer.zero_grad()
-            output = model(data)
-            loss = criterion(output, target)
-            loss.backward()
-            optimizer.step()
-            history.append(loss.item())  # Save loss for plotting
-
-            # Print info
-            # if batch_idx % 10 == 0:
-            print(
-                f"Epoch: {epoch+1}/{epochs} | Batch {batch_idx}/{len(train_loader)} | Loss: {loss.item():.4f}"
-            )
-    return history
-
-
 def main():
     print("Starting")
 
@@ -165,15 +128,9 @@ def main():
     )
 
     # Define the model
-    model = SegmentationModel(num_classes=30).to(device)
+    model = SegmentationModel(num_classes=30).to(DEVICE)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.CrossEntropyLoss()
-
-    # Train the model
-    history = train(model, train_loader, optimizer, criterion, device, EPOCHS)
-
-    # Save model
-    # torch.save(model.state_dict(), "semantic_segmentation.pth")
 
 
 if __name__ == "__main__":
