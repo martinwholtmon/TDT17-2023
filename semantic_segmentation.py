@@ -1,12 +1,11 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
 from pathlib import Path
-import timm
 import torch
-from torch import nn
-from torch import optim
+from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from unet import UNet
+from trainer import Trainer
 
 
 def get_dataloaders(
@@ -80,6 +79,12 @@ def main():
     BATCH_SIZE = 2
     WORKERS = 2
     PIN_MEMORY = True
+    LOAD_MODEL = False
+    MODEL_PATH = (
+        Path(__file__).resolve().parent / "checkpoints" / "semantic_segmentation.pth"
+    )
+    SAVE_FREQ = 1
+    print(DEVICE)
 
     # Load data
     # Define transformations
@@ -116,10 +121,16 @@ def main():
     scaler = torch.cuda.amp.GradScaler()
 
     # Train the model
-    history = train(model, train_loader, optimizer, criterion, device, epochs)
-
-    # Save model
-    # torch.save(model.state_dict(), "semantic_segmentation.pth")
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        criterion=criterion,
+        device=DEVICE,
+        scaler=scaler,
+        model_path=MODEL_PATH,
+        load_model=LOAD_MODEL,
+    )
+    trainer.fit(train_loader, val_loader, epochs=EPOCHS, save_freq=SAVE_FREQ)
 
 
 if __name__ == "__main__":
