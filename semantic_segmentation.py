@@ -4,8 +4,8 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from unet import UNet
 from trainer import Trainer
+from unet import UNet
 
 
 def get_dataloaders(

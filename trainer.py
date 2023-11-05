@@ -1,6 +1,5 @@
 """Contains the trainer class for training the model."""
 import torch
-import numpy as np
 from tqdm import tqdm, trange
 
 
