@@ -23,7 +23,13 @@ class SegmentationModel(nn.Module):
         return self.classifier(features)
 
 
-def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
+def get_dataloaders(
+    batch_size: int = 32,
+    workers: int = 2,
+    pin_memory: bool = True,
+    train_transform: transforms.Compose = None,
+    target_transforms: transforms.Compose = None,
+) -> tuple[DataLoader, DataLoader]:
     """Load the dataset from file
 
     Args:
@@ -36,33 +42,13 @@ def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
     data_dir = Path(__file__).parent / "data" / "cityscapes"
     print(f"Loading data from {data_dir}")
 
-    # Define transformations
-    transform = transforms.Compose(
-        [
-            transforms.Resize((256, 256)),  # Resize images to a fixed size for training
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),  # Normalize with ImageNet stats
-        ]
-    )
-
-    target_transforms = transforms.Compose(
-        [
-            transforms.Resize(
-                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
-            ),  # Resize masks without interpolation
-            transforms.ToTensor(),
-        ]
-    )
-
     # Load data from directory
     train_dataset = datasets.Cityscapes(
         data_dir,
         split="train",
         mode="fine",
         target_type="semantic",
-        transform=transform,
+        transform=train_transform,
         target_transform=target_transforms,
     )
     val_dataset = datasets.Cityscapes(
@@ -70,14 +56,26 @@ def get_dataloaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
         split="val",
         mode="fine",
         target_type="semantic",
-        transform=transform,
+        transform=train_transform,
         target_transform=target_transforms,
     )
 
     # Define dataloaders
     print(f"Loaded. Creating dataloaders...")
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=pin_memory,
+        num_workers=workers,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
+        num_workers=workers,
+    )
 
     # Print info about loaded data
     print(f"Train examples: {len(train_loader.dataset)}")
@@ -126,15 +124,45 @@ def main():
     print("Starting")
 
     # Params
-    epochs = 10
-    batch_size = 2
-
-    # Get device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(device)
+    EPOCHS = 10
+    BATCH_SIZE = 2
+    WORKERS = 2
+    PIN_MEMORY = True
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    LOAD_MODEL = False
+    MODEL_PATH = (
+        Path(__file__).resolve().parent
+        / "checkpoints"
+        / "semantic_segmentation_main.pth"
+    )
+    print(DEVICE)
 
     # Load data
-    train_loader, val_loader = get_dataloaders(batch_size)
+    # Define transformations
+    train_transform = transforms.Compose(
+        [
+            transforms.Resize((256, 256)),  # Resize images to a fixed size for training
+            transforms.RandomRotation(35),
+            transforms.RandomHorizontalFlip(0.5),  # Randomly flip images
+            transforms.RandomVerticalFlip(0.5),  # Randomly flip images
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            ),  # Normalize with ImageNet stats
+        ]
+    )
+
+    target_transforms = transforms.Compose(
+        [
+            transforms.Resize(
+                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
+            ),  # Resize masks without interpolation
+            transforms.ToTensor(),
+        ]
+    )
+    train_loader, val_loader = get_dataloaders(
+        BATCH_SIZE, WORKERS, PIN_MEMORY, train_transform, target_transforms
+    )
 
     # Define the model
     model = SegmentationModel(num_classes=30).to(device)
@@ -142,7 +170,7 @@ def main():
     criterion = nn.CrossEntropyLoss()
 
     # Train the model
-    history = train(model, train_loader, optimizer, criterion, device, epochs)
+    history = train(model, train_loader, optimizer, criterion, device, EPOCHS)
 
     # Save model
     # torch.save(model.state_dict(), "semantic_segmentation.pth")
