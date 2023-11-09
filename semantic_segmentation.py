@@ -1,13 +1,19 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
 from pathlib import Path
-import segmentation_models_pytorch as smp
+
 import torch
+import segmentation_models_pytorch as smp
+import pytorch_lightning as pl
+from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import (
+    EarlyStopping,
+    LearningRateMonitor,
+    ModelCheckpoint,
+)
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-import pytorch_lightning as pl
-from model import SegmentationModel
 
-torch.set_float32_matmul_precision("medium")  # 'medium' | 'high'
+from model import SegmentationModel
 
 
 def get_dataloaders(
@@ -72,14 +78,15 @@ def get_dataloaders(
 
 def main():
     print("Starting")
+    torch.set_float32_matmul_precision("medium")  # 'medium' | 'high'
 
     # Params
     IN_CHANNELS = 3
     LEARNING_RATE = 1e-4
-    CLASSES_TO_PREDICT = 19
+    CLASSES_TO_PREDICT = 35
     EPOCHS = 10
-    BATCH_SIZE = 2
-    WORKERS = 2
+    BATCH_SIZE = 4
+    WORKERS = 4
     PIN_MEMORY = True
     LOAD_MODEL = False
     MODEL_PATH = (
@@ -122,7 +129,9 @@ def main():
     # Define the model, for example, a DeepLabV3 with a ResNet-101 encoder
     ENCODER_NAME = "resnet101"
     ENCODER_WEIGHTS = "imagenet"  # No pre-trained weights
-    ACTIVATION = "softmax2d"  # Could be None for logits or 'softmax2d' for multiclass segmentation
+    ACTIVATION = (
+        None  # Could be None for logits or 'softmax2d' for multiclass segmentation
+    )
 
     # Create the segmentation model with specified encoder
     model = smp.DeepLabV3Plus(
@@ -135,15 +144,34 @@ def main():
     # preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER_NAME, ENCODER_WEIGHTS)
 
     # Define the loss and optimizer function
-    criterion = smp.losses.DiceLoss(mode="multiclass")
-    # criterion = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # Initialize your Lightning model
-    model = SegmentationModel(model=model, criterion=criterion, optimizer=optimizer)
+    model = SegmentationModel(
+        model=model,
+        criterion=criterion,
+        optimizer=optimizer,
+        num_classes=CLASSES_TO_PREDICT,
+    )
+
+    # Define callbacks
+    callbacks = [
+        ModelCheckpoint(
+            dirpath=f"checkpoints/DeepLabV3Plus",
+            filename="{epoch}_{val_loss:.2f}_{val_accuracy:.2f}",
+            save_top_k=10,
+            monitor="val_loss",
+            mode="min",
+        ),
+        EarlyStopping(
+            monitor="val_loss", min_delta=2e-4, patience=8, verbose=False, mode="min"
+        ),
+        LearningRateMonitor(logging_interval="step"),
+    ]
 
     # Initialize a trainer
-    trainer = pl.Trainer(max_epochs=EPOCHS)
+    trainer = pl.Trainer(max_epochs=EPOCHS, callbacks=callbacks)
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 

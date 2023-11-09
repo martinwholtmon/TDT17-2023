@@ -1,92 +1,112 @@
+import torch
 import pytorch_lightning as pl
+from torchmetrics import Accuracy, JaccardIndex, FBetaScore
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, model, criterion, optimizer):
-        super(SegmentationModel, self).__init__()
+    def __init__(self, model, criterion, optimizer, num_classes):
+        super().__init__()
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
-        self.val_losses = []
-        self.val_tps = []
-        self.val_fps = []
-        self.val_fns = []
-        self.val_tns = []
+        self._device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.step_outptus = {
+            "loss": [],
+            "acc": [],
+            "jaccard_index": [],
+            "fbeta_score": [],
+        }
+        self.metrics = {
+            "acc": Accuracy(
+                task="multiclass",
+                num_classes=num_classes,
+                validate_args=True,
+                ignore_index=None,
+                average="micro",
+            ).to(self._device),
+            "jaccard_index": JaccardIndex(
+                task="multiclass",
+                threshold=0.5,
+                num_classes=num_classes,
+                validate_args=True,
+                ignore_index=None,
+                average="macro",
+            ).to(self._device),
+            "fbeta_score": FBetaScore(
+                task="multiclass",
+                beta=1.0,
+                threshold=0.5,
+                num_classes=num_classes,
+                average="micro",
+                ignore_index=None,
+                validate_args=True,
+            ).to(self._device),
+        }
 
     def forward(self, x):
         return self.model(x)
 
-    def training_step(self, batch, batch_idx):
-        images, masks = batch
-        images = images.float()
-        masks = masks.squeeze(1).long()
-        masks_pred = self(images)
-        loss = self.criterion(masks_pred, masks)
-        self.log(
-            "train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
-        )
+    def share_step(self, batch, stage: str):
+        x, y = batch
+        y = y.squeeze(1)
+
+        # Forward pass
+        y_hat = self.forward(x.to(torch.float32))
+        loss = self.criterion(y_hat, y.to(torch.int64))
+        prob_mask = torch.softmax(y_hat, dim=1)
+        prediction = torch.argmax(prob_mask, dim=1)
+
+        # calculate metrics
+        acc = self.metrics["acc"](prediction, y)
+        jaccard_index = self.metrics["jaccard_index"](prediction, y)
+        fbeta_score = self.metrics["fbeta_score"](prediction, y)
+
+        # log metrics
+        self.step_outptus["loss"].append(loss)
+        self.step_outptus["acc"].append(acc)
+        self.step_outptus["jaccard_index"].append(jaccard_index)
+        self.step_outptus["fbeta_score"].append(fbeta_score)
         return loss
+
+    def shared_epoch_end(self, stage):
+        loss = torch.stack(self.step_outptus["loss"]).mean()
+        acc = torch.stack(self.step_outptus["acc"]).mean()
+        jaccard_index = torch.stack(self.step_outptus["jaccard_index"]).mean()
+        fbeta_score = torch.stack(self.step_outptus["fbeta_score"]).mean()
+
+        # log metrics
+        metrics = {
+            f"{stage}_loss": loss,
+            f"{stage}_accuracy": acc,
+            f"{stage}_jaccard_index": jaccard_index,
+            f"{stage}_fbeta_score": fbeta_score,
+        }
+        self.log_dict(metrics, prog_bar=True)
+
+    def training_step(self, batch, batch_idx):
+        return self.share_step(batch, stage="train")
+
+    def on_train_epoch_end(self):
+        self.shared_epoch_end("train")
 
     def validation_step(self, batch, batch_idx):
-        images, masks = batch
-        images = images.float()
-        masks = masks.squeeze(1).long()
-        masks_pred = self(images)
-        loss = self.criterion(masks_pred, masks)
-        self.log("val_loss", loss, prog_bar=True)
-        return loss
+        return self.share_step(batch, stage="val")
 
-    #     # convert mask values to probabilities
-    #     prob_mask = torch.softmax(masks_pred, dim=1)
-    #     pred_labels = torch.argmax(prob_mask, dim=1).long()
+    def on_validation_epoch_end(self):
+        self.shared_epoch_end("val")
 
-    #     # Compute IoU metric
-    #     tp, fp, fn, tn = smp.metrics.get_stats(
-    #         pred_labels, masks, mode="multiclass", threshold=None
-    #     )
-    #     iou = smp.metrics.iou_score(
-    #         tp, fp, fn, tn, reduction="micro"
-    #     )  # 'macro' or 'weighted'
-    #     self.log("val_iou", iou, prog_bar=True)
+    def test_step(self, batch, batch_idx):
+        return self.share_step(batch, stage="test")
 
-    #     # Save the stats to compute epoch average
-    #     self.val_losses.append(loss)
-    #     self.val_tps.append(tp)
-    #     self.val_fps.append(fp)
-    #     self.val_fns.append(fn)
-    #     self.val_tns.append(tn)
+    def on_test_epoch_end(self):
+        self.shared_epoch_end("test")
 
-    #     return {"val_loss": loss, "iou": iou}
-
-    # def on_validation_epoch_end(self):
-    #     avg_loss = torch.stack(self.val_losses).mean()
-    #     tp_sum = torch.stack(self.val_tps).sum(axis=0)
-    #     fp_sum = torch.stack(self.val_fps).sum(axis=0)
-    #     fn_sum = torch.stack(self.val_fns).sum(axis=0)
-    #     tn_sum = torch.stack(self.val_tns).sum(axis=0)
-
-    #     # Compute IoU for the whole epoch
-    #     iou_epoch = smp.metrics.iou_score(
-    #         tp_sum, fp_sum, fn_sum, tn_sum, reduction="micro"
-    #     )
-
-    #     self.log("val_loss_epoch", avg_loss)
-    #     self.log("val_iou_epoch", iou_epoch)
-
-    #     # Clear the lists to free memory
-    #     self.val_losses.clear()
-    #     self.val_tps.clear()
-    #     self.val_fps.clear()
-    #     self.val_fns.clear()
-    #     self.val_tns.clear()
+    def predict_step(self, batch, batch_idx, dataloader_idx=None):
+        x, y = batch
+        y_hat = self.forward(x)
+        prob_mask = torch.softmax(y_hat, dim=1)
+        prediction = torch.argmax(prob_mask, dim=1)
+        return prediction
 
     def configure_optimizers(self):
         return self.optimizer
-
-    # def train_dataloader(self):
-    #     # Return your train dataloader
-    #     return self.train_dataloader
-
-    # def val_dataloader(self):
-    #     # Return your validation dataloader
-    #     return self.val_dataloader
