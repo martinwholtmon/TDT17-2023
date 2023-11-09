@@ -1,26 +1,13 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
 from pathlib import Path
-import timm
+import segmentation_models_pytorch as smp
 import torch
-from torch import nn
-from torch import optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+import pytorch_lightning as pl
+from model import SegmentationModel
 
-
-class SegmentationModel(nn.Module):
-    """The model for semantic segmentation using EfficientViTB3 as backbone"""
-
-    def __init__(self, num_classes) -> None:
-        super(SegmentationModel, self).__init__()
-        self.backbone = timm.create_model("efficientvit_b3", pretrained=True)
-        self.classifier = nn.Conv2d(
-            self.backbone.num_features, num_classes, kernel_size=1
-        )
-
-    def forward(self, x):
-        features = self.backbone(x)
-        return self.classifier(features)
+torch.set_float32_matmul_precision("medium")  # 'medium' | 'high'
 
 
 def get_dataloaders(
@@ -87,18 +74,19 @@ def main():
     print("Starting")
 
     # Params
+    IN_CHANNELS = 3
+    LEARNING_RATE = 1e-4
+    CLASSES_TO_PREDICT = 19
     EPOCHS = 10
     BATCH_SIZE = 2
     WORKERS = 2
     PIN_MEMORY = True
-    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     LOAD_MODEL = False
     MODEL_PATH = (
         Path(__file__).resolve().parent
         / "checkpoints"
         / "semantic_segmentation_main.pth"
     )
-    print(DEVICE)
 
     # Load data
     # Define transformations
@@ -124,13 +112,39 @@ def main():
         ]
     )
     train_loader, val_loader = get_dataloaders(
-        BATCH_SIZE, WORKERS, PIN_MEMORY, train_transform, target_transforms
+        BATCH_SIZE,
+        WORKERS,
+        PIN_MEMORY,
+        train_transform,
+        target_transforms,
     )
 
-    # Define the model
-    model = SegmentationModel(num_classes=30).to(DEVICE)
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
-    criterion = nn.CrossEntropyLoss()
+    # Define the model, for example, a DeepLabV3 with a ResNet-101 encoder
+    ENCODER_NAME = "resnet101"
+    ENCODER_WEIGHTS = "imagenet"  # No pre-trained weights
+    ACTIVATION = "softmax2d"  # Could be None for logits or 'softmax2d' for multiclass segmentation
+
+    # Create the segmentation model with specified encoder
+    model = smp.DeepLabV3Plus(
+        encoder_name=ENCODER_NAME,
+        encoder_weights=ENCODER_WEIGHTS,
+        in_channels=IN_CHANNELS,
+        classes=CLASSES_TO_PREDICT,
+        activation=ACTIVATION,
+    )
+    # preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER_NAME, ENCODER_WEIGHTS)
+
+    # Define the loss and optimizer function
+    criterion = smp.losses.DiceLoss(mode="multiclass")
+    # criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    # Initialize your Lightning model
+    model = SegmentationModel(model=model, criterion=criterion, optimizer=optimizer)
+
+    # Initialize a trainer
+    trainer = pl.Trainer(max_epochs=EPOCHS)
+    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 
 if __name__ == "__main__":
