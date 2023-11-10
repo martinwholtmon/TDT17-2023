@@ -23,7 +23,7 @@ class SegmentationModel(pl.LightningModule):
                 validate_args=True,
                 ignore_index=None,
                 average="micro",
-            ).to(self._device),
+            ),
             "jaccard_index": JaccardIndex(
                 task="multiclass",
                 threshold=0.5,
@@ -31,7 +31,7 @@ class SegmentationModel(pl.LightningModule):
                 validate_args=True,
                 ignore_index=None,
                 average="macro",
-            ).to(self._device),
+            ),
             "fbeta_score": FBetaScore(
                 task="multiclass",
                 beta=1.0,
@@ -40,7 +40,7 @@ class SegmentationModel(pl.LightningModule):
                 average="micro",
                 ignore_index=None,
                 validate_args=True,
-            ).to(self._device),
+            ),
         }
 
     def forward(self, x):
@@ -81,7 +81,7 @@ class SegmentationModel(pl.LightningModule):
             f"{stage}_jaccard_index": jaccard_index,
             f"{stage}_fbeta_score": fbeta_score,
         }
-        self.log_dict(metrics, prog_bar=True)
+        self.log_dict(metrics, prog_bar=True, sync_dist=True)
 
     def training_step(self, batch, batch_idx):
         return self.share_step(batch, stage="train")

@@ -111,7 +111,14 @@ def main():
     ]
 
     # Initialize a trainer
-    trainer = pl.Trainer(max_epochs=EPOCHS, callbacks=callbacks)
+    trainer = pl.Trainer(
+        devices=2,
+        num_nodes=1,
+        accelerator="gpu",
+        strategy="ddp",
+        max_epochs=EPOCHS,
+        callbacks=callbacks,
+    )
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
 
