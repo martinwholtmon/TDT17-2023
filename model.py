@@ -4,12 +4,11 @@ from torchmetrics import MetricCollection, Accuracy, JaccardIndex, FBetaScore
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, model, criterion, optimizer, num_classes):
+    def __init__(self, model, num_classes, lr: float = None):
         super().__init__()
-        self.save_hyperparameters()
+        self.save_hyperparameters(ignore=["model"])
         self.model = model
-        self.criterion = criterion
-        self.optimizer = optimizer
+        self.criterion = torch.nn.CrossEntropyLoss()
         self.num_classes = num_classes
         metrics = MetricCollection(
             [
@@ -96,4 +95,8 @@ class SegmentationModel(pl.LightningModule):
         return prediction
 
     def configure_optimizers(self):
-        return self.optimizer
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr)
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer, max_lr=self.hparams.lr, total_steps=868 * 7
+        )
+        return [optimizer], [scheduler]

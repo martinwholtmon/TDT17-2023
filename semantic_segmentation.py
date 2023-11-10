@@ -24,7 +24,7 @@ def main():
     IN_CHANNELS = 3
     LEARNING_RATE = 1e-4
     CLASSES_TO_PREDICT = 20
-    EPOCHS = 10
+    EPOCHS = 6
     BATCH_SIZE = 4
     WORKERS = 4
     PIN_MEMORY = True
@@ -81,18 +81,13 @@ def main():
         classes=CLASSES_TO_PREDICT,
         activation=ACTIVATION,
     )
-    # preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER_NAME, ENCODER_WEIGHTS)
-
-    # Define the loss and optimizer function
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER_NAME, ENCODER_WEIGHTS)E)
 
     # Initialize your Lightning model
     model = SegmentationModel(
         model=model,
-        criterion=criterion,
-        optimizer=optimizer,
         num_classes=CLASSES_TO_PREDICT,
+        lr=LEARNING_RATE,
     )
 
     # Define callbacks
@@ -109,7 +104,7 @@ def main():
         ),
         LearningRateMonitor(logging_interval="step"),
     ]
-    logger = TensorBoardLogger(save_dir="./logs", name="DeepLabV3Plus")
+    # logger = TensorBoardLogger(save_dir="./logs", name="DeepLabV3Plus")
 
     # Initialize a trainer
     trainer = pl.Trainer(
@@ -119,7 +114,7 @@ def main():
         # strategy="ddp",
         max_epochs=EPOCHS,
         callbacks=callbacks,
-        logger=logger,
+        # logger=logger,
     )
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
