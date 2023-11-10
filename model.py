@@ -6,6 +6,7 @@ from torchmetrics import MetricCollection, Accuracy, JaccardIndex, FBetaScore
 class SegmentationModel(pl.LightningModule):
     def __init__(self, model, criterion, optimizer, num_classes):
         super().__init__()
+        self.save_hyperparameters()
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
