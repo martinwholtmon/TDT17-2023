@@ -23,7 +23,7 @@ def main():
     # Params
     IN_CHANNELS = 3
     LEARNING_RATE = 1e-4
-    CLASSES_TO_PREDICT = 35
+    CLASSES_TO_PREDICT = 20
     EPOCHS = 10
     BATCH_SIZE = 4
     WORKERS = 4
@@ -109,15 +109,17 @@ def main():
         ),
         LearningRateMonitor(logging_interval="step"),
     ]
+    logger = TensorBoardLogger(save_dir="./logs", name="DeepLabV3Plus")
 
     # Initialize a trainer
     trainer = pl.Trainer(
-        devices=1,
-        num_nodes=1,
-        accelerator="gpu",
-        strategy="ddp",
+        # devices=1,
+        # num_nodes=1,
+        # accelerator="gpu",
+        # strategy="ddp",
         max_epochs=EPOCHS,
         callbacks=callbacks,
+        logger=logger,
     )
     trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
