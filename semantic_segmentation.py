@@ -112,7 +112,7 @@ def main():
 
     # Initialize a trainer
     trainer = pl.Trainer(
-        devices=2,
+        devices=1,
         num_nodes=1,
         accelerator="gpu",
         strategy="ddp",
