@@ -38,6 +38,7 @@ class SegmentationModel(pl.LightningModule):
 
         # Log metrics
         metrics_dict = {
+            f"{stage}_loss": loss,
             f"{stage}_acc": acc_value,
             f"{stage}_jaccard": jaccard_index_value,
             f"{stage}_fbeta": fbeta_score_value,
