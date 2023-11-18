@@ -1,14 +1,21 @@
 import torch
 import pytorch_lightning as pl
-from torchmetrics import MetricCollection, Accuracy, JaccardIndex, FBetaScore
+from torchmetrics import Accuracy, FBetaScore, JaccardIndex, MetricCollection
 
 
 class SegmentationModel(pl.LightningModule):
-    def __init__(self, model, num_classes, lr: float = None):
+    def __init__(
+        self,
+        model,
+        num_classes,
+        lr=None,
+        total_steps=5 * 744,
+        ignore_index=0,
+    ):
         super().__init__()
         self.save_hyperparameters(ignore=["model"])
         self.model = model
-        self.criterion = torch.nn.CrossEntropyLoss()
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.num_classes = num_classes
         metrics = MetricCollection(
             [
@@ -16,7 +23,7 @@ class SegmentationModel(pl.LightningModule):
                     task="multiclass",
                     num_classes=self.num_classes,
                     validate_args=True,
-                    ignore_index=None,
+                    ignore_index=ignore_index,
                     average="micro",
                 ),
                 JaccardIndex(
@@ -24,7 +31,7 @@ class SegmentationModel(pl.LightningModule):
                     threshold=0.5,
                     num_classes=self.num_classes,
                     validate_args=True,
-                    ignore_index=None,
+                    ignore_index=ignore_index,
                     average="macro",
                 ),
                 FBetaScore(
@@ -33,7 +40,7 @@ class SegmentationModel(pl.LightningModule):
                     threshold=0.5,
                     num_classes=self.num_classes,
                     average="micro",
-                    ignore_index=None,
+                    ignore_index=ignore_index,
                     validate_args=True,
                 ),
             ],
@@ -97,6 +104,6 @@ class SegmentationModel(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer, max_lr=self.hparams.lr, total_steps=868 * 7
+            optimizer, max_lr=self.hparams.lr, total_steps=int(self.hparams.total_steps)
         )
         return [optimizer], [scheduler]
