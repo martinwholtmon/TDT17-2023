@@ -155,3 +155,79 @@ def get_dataloaders(
     print(f"Train examples: {len(train_loader.dataset)}")
     print(f"Val examples: {len(val_loader.dataset)}")
     return train_loader, val_loader
+
+
+def visualize_dataloader(dataloader):
+    # Create iterator for a dataloader
+    data_iter = iter(dataloader)
+
+    # Get a batch of data from each loader
+    images, labels = next(data_iter)
+    labels = labels.unsqueeze(1)  # Add a channel dimension
+    batch_size = images.size(0)
+
+    # Set up the plots
+    fig, axes = plt.subplots(nrows=2, ncols=batch_size, figsize=(20, 10))
+    fig.suptitle("Sample Training Data")
+
+    # Plot training images and masks
+    for i in range(batch_size):
+        img = images[i].numpy().transpose((1, 2, 0))  # Correcting channel order
+        img = (img - img.min()) / (
+            img.max() - img.min()
+        )  # Normalize to 0-1 if not already
+
+        axes[0, i].imshow(img)
+        axes[0, i].axis("off")
+        axes[0, i].set_title("Image")
+        axes[1, i].imshow(
+            decode_segmap(labels[i].squeeze(), dataloader.dataset.color_map)
+        )
+        axes[1, i].axis("off")
+        axes[1, i].set_title("Label")
+
+    # Show the plots
+    plt.show()
+
+
+def visualize_predictions(model, dataloader):
+    # Create iterator for the dataloader
+    data_iter = iter(dataloader)
+
+    # Get a batch of data from the dataloader
+    images, labels = next(data_iter)
+    labels = labels.unsqueeze(1)  # Add a channel dimension
+
+    # Make predictions using the model
+    model.eval()
+    predictions = model(images)
+
+    # Set up the plots
+    fig, axes = plt.subplots(nrows=3, ncols=len(images), figsize=(20, 10))
+    fig.suptitle("Prediction on a sample from val loader")
+
+    # Plot images, labels, and predictions
+    for i, img_tensor in enumerate(images):
+        img = img_tensor.numpy().transpose((1, 2, 0))  # Correcting channel order
+        img = (img - img.min()) / (
+            img.max() - img.min()
+        )  # Normalize to 0-1 if not already
+
+        axes[0, i].imshow(img)
+        axes[0, i].axis("off")
+        axes[0, i].set_title("Image")
+
+        axes[1, i].imshow(
+            decode_segmap(labels[i].squeeze(), dataloader.dataset.color_map)
+        )
+        axes[1, i].axis("off")
+        axes[1, i].set_title("Label")
+
+        axes[2, i].imshow(
+            decode_segmap(predictions[i].argmax(axis=0), dataloader.dataset.color_map)
+        )
+        axes[2, i].axis("off")
+        axes[2, i].set_title("Prediction")
+
+    # Show the plots
+    plt.show()
