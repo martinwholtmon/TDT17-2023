@@ -1,5 +1,5 @@
-import torch
 import pytorch_lightning as pl
+import torch
 from torchmetrics import Accuracy, FBetaScore, JaccardIndex, MetricCollection
 
 
@@ -53,53 +53,43 @@ class SegmentationModel(pl.LightningModule):
     def forward(self, x):
         return self.model(x)
 
-    def share_step(self, batch, stage: str, on_step: bool, on_epoch: bool):
-        x, y = batch
+    def _share_step(self, batch, prefix, batch_idx, metric, on_epoch=False):
+        """This is custom, but often common to create a function that is shared between training, validation and test step.
 
-        # Forward pass
-        y_hat = self.forward(x.to(torch.float32))
-        loss = self.criterion(y_hat, y.to(torch.int64))
-        prob_mask = torch.softmax(y_hat, dim=1)
-        prediction = torch.argmax(prob_mask, dim=1)
+        Args:
+            batch (Tensor): _description_
+            prefix (str): _description_
+            batch_idx (int): _description_
+            metric (torchmetrics.Metric): Metric to use.
+            on_epoch (bool, optional): Logs epoch accumulated metrics. Defaults to False.
 
-        # Log metrics
-        match stage:
-            case "train":
-                output = self.train_metrics(prediction, y)
-            case "val":
-                output = self.valid_metrics(prediction, y)
-            case "test":
-                output = self.test_metrics(prediction, y)
-            case _:
-                raise ValueError(f"Invalid stage: {stage}")
+        Returns:
+            float: loss
+        """
+        images, targets = batch
 
-        # Add loss to the output dictionary
-        output[f"{stage}_loss"] = loss
+        # forward pass and loss
+        outputs = self.forward(images)
+        loss = self.criterion(outputs, targets)
 
-        self.log_dict(
-            output,
-            prog_bar=True,
-            sync_dist=True,
-            on_step=on_step,
-            on_epoch=on_epoch,
-        )
+        # log metrics
+        metric_dict = {f"{prefix}_loss": loss}
+        metric_dict.update(metric(outputs, targets))
+        self.log_dict(metric_dict, prog_bar=True, on_step=True, on_epoch=on_epoch)
         return loss
 
     def training_step(self, batch, batch_idx):
-        return self.share_step(batch, "train", on_step=True, on_epoch=False)
+        return self._share_step(batch, "train", batch_idx, self.train_metrics)
 
     def validation_step(self, batch, batch_idx):
-        return self.share_step(batch, "val", on_step=True, on_epoch=True)
+        return self._share_step(
+            batch, "val", batch_idx, self.valid_metrics, on_epoch=True
+        )
 
     def test_step(self, batch, batch_idx):
-        return self.share_step(batch, "test", on_step=True, on_epoch=True)
-
-    def predict_step(self, batch, batch_idx, dataloader_idx=None):
-        x, y = batch
-        y_hat = self.forward(x)
-        prob_mask = torch.softmax(y_hat, dim=1)
-        prediction = torch.argmax(prob_mask, dim=1)
-        return prediction
+        return self._share_step(
+            batch, "test", batch_idx, self.test_metrics, on_epoch=True
+        )
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=self.hparams.lr)
