@@ -1,5 +1,5 @@
 """Module to load the cityscapes dataset"""
-from pathlib import Path
+import os
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms, datasets
 
@@ -49,7 +49,7 @@ def get_dataloaders(
         tuple[DataLoader, DataLoader]: train_loader, val_loader
     """
     # root dir
-    data_dir = Path(__file__).parent / "data" / "cityscapes"
+    data_dir = os.path.join(os.path.abspath(""), "data", "cityscapes")
     print(f"Loading data from {data_dir}")
 
     # Load data from directory
@@ -63,6 +63,7 @@ def get_dataloaders(
             target_transform=target_transforms,
         )
     )
+
     val_dataset = CityScapesDatasetWrapper(
         datasets.Cityscapes(
             data_dir,
@@ -73,9 +74,6 @@ def get_dataloaders(
             target_transform=target_transforms,
         )
     )
-
-    print(f"Loaded {len(train_dataset)} train examples")
-    print(f"Nr. classes: {len(train_dataset.class_names)}")
 
     # Define dataloaders
     print(f"Loaded. Creating dataloaders...")
