@@ -1,48 +1,48 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
-from pathlib import Path
+import os
 
-import torch
-import segmentation_models_pytorch as smp
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import TensorBoardLogger
+import segmentation_models_pytorch as smp
+import torch
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from pytorch_lightning.loggers import TensorBoardLogger
 from torchvision import transforms
 
 from dataloader import get_dataloaders
 from model import SegmentationModel
 
 
+def custom_target_transform(x):
+    return (x * 255).to(torch.long)
+
+
 def main():
     print("Starting")
-    torch.set_float32_matmul_precision("medium")  # 'medium' | 'high'
 
     # Params
+    DEV_RUN = False
     IN_CHANNELS = 3
-    LEARNING_RATE = 1e-4
-    CLASSES_TO_PREDICT = 20
-    EPOCHS = 6
     BATCH_SIZE = 4
-    WORKERS = 4
-    PIN_MEMORY = True
-    LOAD_MODEL = False
-    MODEL_PATH = (
-        Path(__file__).resolve().parent
-        / "checkpoints"
-        / "semantic_segmentation_main.pth"
-    )
+    EPOCHS = 20
+    LEARNING_RATE = 1e-4
+    RESOLUTION = 768  # 256, 512, 768, 1024
+    PIN_MEMORY = False
+    WORKERS = 0
+    NAME = "DeepLabV3Plus50"  # name to save checkpoints)
+    CHECKPOINT_NAME = None  # "name" | None -> load checkpoint from file
+    CHECKPOINT_DIR = os.path.join(os.path.abspath(""), "checkpoints", NAME)
 
     # Load data
     # Define transformations
     train_transform = transforms.Compose(
         [
-            transforms.Resize((256, 256)),  # Resize images to a fixed size for training
-            transforms.RandomRotation(35),
-            transforms.RandomHorizontalFlip(0.5),  # Randomly flip images
-            transforms.RandomVerticalFlip(0.5),  # Randomly flip images
+            transforms.Resize(
+                (RESOLUTION, RESOLUTION)
+            ),  # Resize images to a fixed size for training
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -53,9 +53,11 @@ def main():
     target_transforms = transforms.Compose(
         [
             transforms.Resize(
-                (256, 256), interpolation=transforms.InterpolationMode.NEAREST
+                (RESOLUTION, RESOLUTION),
+                interpolation=transforms.InterpolationMode.NEAREST,
             ),  # Resize masks without interpolation
             transforms.ToTensor(),
+            custom_target_transform,
         ]
     )
     train_loader, val_loader = get_dataloaders(
@@ -67,14 +69,15 @@ def main():
     )
 
     # Define the model, for example, a DeepLabV3 with a ResNet-101 encoder
-    ENCODER_NAME = "resnet101"
+    ENCODER_NAME = "resnet50"
     ENCODER_WEIGHTS = "imagenet"  # No pre-trained weights
     ACTIVATION = (
         None  # Could be None for logits or 'softmax2d' for multiclass segmentation
     )
+    CLASSES_TO_PREDICT = len(train_loader.dataset.classes)
 
     # Create the segmentation model with specified encoder
-    model = smp.DeepLabV3Plus(
+    smp_model = smp.DeepLabV3Plus(
         encoder_name=ENCODER_NAME,
         encoder_weights=ENCODER_WEIGHTS,
         in_channels=IN_CHANNELS,
@@ -85,17 +88,23 @@ def main():
 
     # Initialize your Lightning model
     model = SegmentationModel(
-        model=model,
+        model=smp_model,
         num_classes=CLASSES_TO_PREDICT,
         lr=LEARNING_RATE,
+        total_steps=EPOCHS * len(train_loader),
+        ignore_index=0,
     )
+    if CHECKPOINT_NAME is not None:
+        model = model.load_from_checkpoint(
+            os.path.join(CHECKPOINT_DIR, CHECKPOINT_NAME)
+        )
 
     # Define callbacks
     callbacks = [
         ModelCheckpoint(
-            dirpath=f"checkpoints/DeepLabV3Plus",
-            filename="{epoch}_{val_loss:.2f}_{val_accuracy:.2f}",
-            save_top_k=10,
+            dirpath=CHECKPOINT_DIR,
+            filename="{epoch}_{val_loss:.3f}_{val_MulticlassJaccardIndex:.3f}",
+            save_top_k=3,
             monitor="val_loss",
             mode="min",
         ),
@@ -104,19 +113,24 @@ def main():
         ),
         LearningRateMonitor(logging_interval="step"),
     ]
-    # logger = TensorBoardLogger(save_dir="./logs", name="DeepLabV3Plus")
+    logger = TensorBoardLogger(save_dir="./logs", name=NAME)
 
     # Initialize a trainer
     trainer = pl.Trainer(
-        # devices=1,
-        # num_nodes=1,
-        # accelerator="gpu",
-        # strategy="ddp",
+        accelerator="gpu",
+        precision=16,
         max_epochs=EPOCHS,
+        fast_dev_run=DEV_RUN,
         callbacks=callbacks,
-        # logger=logger,
+        logger=logger,
+        profiler="simple",
     )
-    trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    if CHECKPOINT_NAME is None:
+        trainer.fit(
+            model=model, train_dataloaders=train_loader, val_dataloaders=val_loader
+        )
+    else:
+        trainer.test(model=model, dataloaders=val_loader)
 
 
 if __name__ == "__main__":
