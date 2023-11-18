@@ -173,5 +173,5 @@ cython_debug/
 *.vsix
 
 data/
-lightning_logs/
+logs/
 checkpoints/
