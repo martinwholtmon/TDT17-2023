@@ -1,36 +1,95 @@
 """Module to load the cityscapes dataset"""
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms, datasets
+from torchvision import datasets, transforms
 
 
 class CityScapesDatasetWrapper(Dataset):
     def __init__(self, dataset):
+        """Initialize the wrapper for the CityScapes dataset."""
         self.dataset = dataset
-        # for mask postprocessing
-        valid_classes = list(
-            filter(lambda x: x.ignore_in_eval is False, self.dataset.classes)
-        )
-        self.class_names = [x.name for x in valid_classes] + ["void"]
-        self.id_map = {
-            old_id: new_id
-            for (new_id, old_id) in enumerate([x.id for x in valid_classes])
-        }
+        self.ignore_train_id = 255
+        self.unlabeled_id = 0
+
+        self.classes = [self.dataset.classes[self.unlabeled_id]] + [
+            cls for cls in self.dataset.classes if not cls.ignore_in_eval
+        ]
+
+        self.class_names = [cls.name for cls in self.classes]
+        self.id_map = self._create_id_map()
+        self.color_map = self._create_color_map()
+        self.mapping_tensor = self._create_mapping_tensor()
+        self.reverse_mapping_tensor = self._create_reverse_mapping_tensor()
 
     def __len__(self):
+        """Return the length of the dataset."""
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        img, label = self.dataset[idx]
-        for cur_id in label.unique():
-            cur_id = cur_id.item()
-            if cur_id not in self.id_map.keys():
-                label[label == cur_id] = 250
-            else:
-                label[label == cur_id] = self.id_map[cur_id]
-        label[label == 250] = 19
-        label = label.squeeze(0)
-        return (img, label)
+        """Get the image and remapped target for the given index."""
+        image, target = self.dataset[idx]
+        target = self.mapping_tensor.to(target.device)[target]
+        return image, target.squeeze(0)
+
+    def _create_id_map(self):
+        """Create a map from original IDs to new IDs."""
+        return {
+            old_id: new_id
+            for new_id, old_id in enumerate(cls.id for cls in self.classes)
+        }
+
+    def _create_mapping_tensor(self):
+        """Create a tensor for mapping original IDs to new IDs."""
+        return create_mapping_tensor(self.id_map, self.unlabeled_id)
+
+    def _create_reverse_mapping_tensor(self):
+        """Create a tensor for mapping new IDs back to original IDs."""
+        reverse_id_map = {new_id: old_id for old_id, new_id in self.id_map.items()}
+        return create_mapping_tensor(reverse_id_map, self.unlabeled_id)
+
+    def _create_color_map(self):
+        """Create a color map for visualizing the segmentation masks."""
+        color_map = {}
+        for cls in self.classes:
+            color_map[self.id_map[cls.id]] = cls.color
+        return color_map
+
+
+def create_mapping_tensor(id_map, unlabeled_id=0):
+    max_id = max(id_map.keys())
+    mapping_tensor = torch.full((max_id + 1,), unlabeled_id, dtype=torch.long)
+    for old_id, new_id in id_map.items():
+        mapping_tensor[old_id] = new_id
+    return mapping_tensor
+
+
+def decode_segmap(mask_tensor, color_map) -> np.ndarray:
+    """
+    Converts a mask (2D tensor of IDs) to an RGB image using the given color map.
+
+    Args:
+    - mask_tensor: A 2D tensor where each element is an ID representing a color.
+    - color_map: A dictionary mapping IDs to RGB color tuples.
+
+    Returns:
+    - A 3D numpy array representing the RGB image.
+    """
+    height, width = mask_tensor.shape
+    rgb = np.zeros((height, width, 3), dtype=np.uint8)
+
+    # Ensure mask_tensor is on CPU and in numpy format for processing
+    if mask_tensor.is_cuda:
+        mask_tensor = mask_tensor.cpu()
+    mask = mask_tensor.numpy()
+
+    for i in range(height):
+        for j in range(width):
+            rgb[i, j, :] = color_map[mask[i, j]]
+    return rgb
 
 
 def get_dataloaders(
