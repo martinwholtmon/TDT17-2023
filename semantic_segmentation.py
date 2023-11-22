@@ -28,8 +28,8 @@ def main():
     IN_CHANNELS = 3
     BATCH_SIZE = 4
     EPOCHS = 20
-    LEARNING_RATE = 1e-4
-    RESOLUTION = 768  # 256, 512, 768, 1024
+    LEARNING_RATE = 1e-5
+    RESOLUTION = 1024  # 256, 512, 768, 1024
     PIN_MEMORY = False
     WORKERS = 0
     NAME = "DeepLabV3Plus50"  # name to save checkpoints)
@@ -96,14 +96,14 @@ def main():
     )
     if CHECKPOINT_NAME is not None:
         model = model.load_from_checkpoint(
-            os.path.join(CHECKPOINT_DIR, CHECKPOINT_NAME)
+            os.path.join(CHECKPOINT_DIR, CHECKPOINT_NAME), model=smp_model
         )
 
     # Define callbacks
     callbacks = [
         ModelCheckpoint(
             dirpath=CHECKPOINT_DIR,
-            filename="{epoch}_{val_loss:.3f}_{val_MulticlassJaccardIndex:.3f}",
+            filename="{epoch}_{val_loss:.3f}_{val_MulticlassJaccardIndex_micro:.3f}",
             save_top_k=3,
             monitor="val_loss",
             mode="min",
