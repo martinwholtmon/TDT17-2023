@@ -32,7 +32,7 @@ class SegmentationModel(pl.LightningModule):
                     num_classes=self.num_classes,
                     validate_args=True,
                     ignore_index=ignore_index,
-                    average="macro",
+                    average="micro",
                 ),
                 FBetaScore(
                     task="multiclass",
