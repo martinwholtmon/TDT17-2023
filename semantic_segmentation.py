@@ -35,19 +35,24 @@ def main():
     config = load_config(os.path.join(project_dir_path, "config.json"))
 
     # Use parameters from the config file
-    DEV_RUN = config.get("DEV_RUN", False)
-    IN_CHANNELS = config.get("IN_CHANNELS", 3)
-    BATCH_SIZE = config.get("BATCH_SIZE", 4)
-    EPOCHS = config.get("EPOCHS", 20)
-    LEARNING_RATE = config.get("LEARNING_RATE", 1e-5)
-    RESOLUTION = config.get("RESOLUTION", 1024)
-    PIN_MEMORY = config.get("PIN_MEMORY", False)
-    WORKERS = config.get("WORKERS", 0)
-    NAME = config.get("NAME", "DeepLabV3Plus50")
-    CHECKPOINT_NAME = config.get(
-        "CHECKPOINT_NAME", None
-    )  # "name" | None -> load checkpoint from file
+    general_config = config["general"]
+    DEV_RUN = general_config.get("DEV_RUN", False)
+    IN_CHANNELS = general_config.get("IN_CHANNELS", 3)
+    BATCH_SIZE = general_config.get("BATCH_SIZE", 4)
+    EPOCHS = general_config.get("EPOCHS", 20)
+    LEARNING_RATE = general_config.get("LEARNING_RATE", 1e-5)
+    RESOLUTION = general_config.get("RESOLUTION", 1024)
+    PIN_MEMORY = general_config.get("PIN_MEMORY", False)
+    WORKERS = general_config.get("WORKERS", 0)
+    NAME = general_config.get("NAME", "DeepLabV3Plus50")
+    CHECKPOINT_NAME = general_config.get("CHECKPOINT_NAME", None)
     CHECKPOINT_DIR = os.path.join(project_dir_path, "checkpoints", NAME)
+
+    # SMP Model parameters
+    smp_config = config["smp_model"]
+    ENCODER_NAME = smp_config.get("ENCODER_NAME", "resnet50")
+    ENCODER_WEIGHTS = smp_config.get("ENCODER_WEIGHTS", "imagenet")
+    ACTIVATION = smp_config.get("ACTIVATION", None)
 
     # Load data
     # Define transformations
@@ -80,13 +85,6 @@ def main():
         train_transform,
         target_transforms,
     )
-
-    # Define the model, for example, a DeepLabV3 with a ResNet-101 encoder
-    ENCODER_NAME = "resnet50"
-    ENCODER_WEIGHTS = "imagenet"  # No pre-trained weights
-    ACTIVATION = (
-        None  # Could be None for logits or 'softmax2d' for multiclass segmentation
-    )
     CLASSES_TO_PREDICT = len(train_loader.dataset.classes)
 
     # Create the segmentation model with specified encoder
@@ -97,7 +95,6 @@ def main():
         classes=CLASSES_TO_PREDICT,
         activation=ACTIVATION,
     )
-    # preprocessing_fn = smp.encoders.get_preprocessing_fn(ENCODER_NAME, ENCODER_WEIGHTS)E)
 
     # Initialize your Lightning model
     model = SegmentationModel(

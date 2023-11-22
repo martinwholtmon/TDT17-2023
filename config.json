@@ -1,12 +1,19 @@
 {
-    "DEV_RUN": false,
-    "IN_CHANNELS": 3,
-    "BATCH_SIZE": 4,
-    "EPOCHS": 20,
-    "LEARNING_RATE": 0.00001,
-    "RESOLUTION": 1024,
-    "PIN_MEMORY": false,
-    "WORKERS": 0,
-    "NAME": "DeepLabV3Plus50",
-    "CHECKPOINT_NAME": "epoch=19_val_loss=0.647_val_MulticlassJaccardIndex_micro=0.300.ckpt"
+    "general": {
+        "DEV_RUN": false,
+        "IN_CHANNELS": 3,
+        "BATCH_SIZE": 4,
+        "EPOCHS": 20,
+        "LEARNING_RATE": 0.00001,
+        "RESOLUTION": 1024,
+        "PIN_MEMORY": false,
+        "WORKERS": 0,
+        "NAME": "DeepLabV3Plus50",
+        "CHECKPOINT_NAME": "epoch=19_val_loss=0.647_val_MulticlassJaccardIndex_micro=0.300.ckpt"
+    },
+    "smp_model": {
+        "ENCODER_NAME": "resnet50",
+        "ENCODER_WEIGHTS": "imagenet",
+        "ACTIVATION": null
+    }
 }
