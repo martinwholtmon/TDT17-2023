@@ -1,4 +1,5 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
+import json
 import os
 
 import pytorch_lightning as pl
@@ -20,21 +21,33 @@ def custom_target_transform(x):
     return (x * 255).to(torch.long)
 
 
+def load_config(config_path):
+    """Load the configuration from a JSON file."""
+    with open(config_path, "r") as file:
+        return json.load(file)
+
+
 def main():
     print("Starting")
+    project_dir_path = os.path.dirname(os.path.abspath(__file__))
 
-    # Params
-    DEV_RUN = False
-    IN_CHANNELS = 3
-    BATCH_SIZE = 4
-    EPOCHS = 20
-    LEARNING_RATE = 1e-5
-    RESOLUTION = 1024  # 256, 512, 768, 1024
-    PIN_MEMORY = False
-    WORKERS = 0
-    NAME = "DeepLabV3Plus50"  # name to save checkpoints)
-    CHECKPOINT_NAME = None  # "name" | None -> load checkpoint from file
-    CHECKPOINT_DIR = os.path.join(os.path.abspath(""), "checkpoints", NAME)
+    # Load params from JSON file
+    config = load_config(os.path.join(project_dir_path, "config.json"))
+
+    # Use parameters from the config file
+    DEV_RUN = config.get("DEV_RUN", False)
+    IN_CHANNELS = config.get("IN_CHANNELS", 3)
+    BATCH_SIZE = config.get("BATCH_SIZE", 4)
+    EPOCHS = config.get("EPOCHS", 20)
+    LEARNING_RATE = config.get("LEARNING_RATE", 1e-5)
+    RESOLUTION = config.get("RESOLUTION", 1024)
+    PIN_MEMORY = config.get("PIN_MEMORY", False)
+    WORKERS = config.get("WORKERS", 0)
+    NAME = config.get("NAME", "DeepLabV3Plus50")
+    CHECKPOINT_NAME = config.get(
+        "CHECKPOINT_NAME", None
+    )  # "name" | None -> load checkpoint from file
+    CHECKPOINT_DIR = os.path.join(project_dir_path, "checkpoints", NAME)
 
     # Load data
     # Define transformations
