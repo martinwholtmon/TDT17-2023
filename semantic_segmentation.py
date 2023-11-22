@@ -1,10 +1,8 @@
 """Perform semantic segmentation on CityScapes dataset using EfficientViTB3 as backbone"""
-import json
 import os
 
 import pytorch_lightning as pl
 import segmentation_models_pytorch as smp
-import torch
 from pytorch_lightning.callbacks import (
     EarlyStopping,
     LearningRateMonitor,
@@ -15,16 +13,7 @@ from torchvision import transforms
 
 from dataloader import get_dataloaders
 from model import SegmentationModel
-
-
-def custom_target_transform(x):
-    return (x * 255).to(torch.long)
-
-
-def load_config(config_path):
-    """Load the configuration from a JSON file."""
-    with open(config_path, "r") as file:
-        return json.load(file)
+from helpers import load_config, custom_target_transform
 
 
 def main():
