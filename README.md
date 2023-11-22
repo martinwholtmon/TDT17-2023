@@ -18,7 +18,7 @@ data/cityscapes
  - [x] Select a network structure
  - [x] Train a network for image segmentation on cityscapes
  - [x] Perform semantic segmentation (inference) on cityscapes
- - [ ] Run inference on 3 random images from Trondheim
+ - [x] Run inference on 3 random images from Trondheim
 
 
 
