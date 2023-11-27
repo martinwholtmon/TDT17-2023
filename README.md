@@ -28,7 +28,7 @@ data/cityscapes
 - [Timm](https://github.com/huggingface/pytorch-image-models/tree/main) - PyTorch Image Models
 - [segmentation_models.pytorch](https://github.com/qubvel/segmentation_models.pytorch) - Segmentation models with pretrained backbones
 - [Pytorch Dataset](https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files)
-- [TorchMetrics](hhttps://lightning.ai/docs/torchmetrics/stable/) - PyTorch metrics implementations and an easy-to-use API to create custom metrics
+- [TorchMetrics](https://lightning.ai/docs/torchmetrics/stable/) - PyTorch metrics implementations and an easy-to-use API to create custom metrics
   - [Accuracy](https://torchmetrics.readthedocs.io/en/stable/classification/accuracy.html)
   - [Jaccard Index](https://lightning.ai/docs/torchmetrics/stable/classification/jaccard_index.html) - intersetion over union or jaccard similarity coefficient
   - [F-Beta Score](https://lightning.ai/docs/torchmetrics/stable/classification/fbeta_score.html)
